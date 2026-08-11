@@ -1,0 +1,104 @@
+name: HMS Backend CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root_password
+          MYSQL_DATABASE: hms_dev
+          MYSQL_USER: hms_user
+          MYSQL_PASSWORD: hms_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -proot_password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      NODE_ENV: development
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: hms_user
+      DB_PASSWORD: hms_password
+      DB_NAME: hms_dev
+      REDIS_URL: redis://127.0.0.1:6379
+      JWT_SECRET: ci_test_secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Write .env.development for CI
+        run: |
+          cat <<EOF > .env.development
+          NODE_ENV=development
+          PORT=4000
+          DB_HOST=127.0.0.1
+          DB_PORT=3306
+          DB_USER=hms_user
+          DB_PASSWORD=hms_password
+          DB_NAME=hms_dev
+          REDIS_URL=redis://127.0.0.1:6379
+          JWT_SECRET=ci_test_secret
+          EOF
+
+      - name: Wait for MySQL
+        run: |
+          for i in {1..30}; do
+            mysqladmin ping -h 127.0.0.1 -u hms_user -phms_password --silent && break
+            sleep 2
+          done
+
+      - name: Run migrations
+        run: npm run migrate:up
+
+      - name: Run tests (unit + integration)
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  deploy-staging:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to staging
+        run: |
+          echo "TODO: replace with real deploy step once staging host is provisioned (Phase 0 infra decision - see Spec §11)."
+          echo "Placeholder only - does not yet satisfy the 'staging /health returns 200' test gate."
