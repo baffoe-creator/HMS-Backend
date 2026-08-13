@@ -5,6 +5,10 @@ import authRoutes from './modules/auth/auth.routes';
 import userRoutes from './modules/users/user.routes';
 import patientRoutes from './modules/patients/patient.routes';
 import appointmentRoutes from './modules/appointments/appointment.routes';
+import icdRoutes from './modules/icd/icd.routes';
+import clinicalRecordRoutes from './modules/clinicalRecords/clinicalRecord.routes';
+import labOrderRoutes from './modules/labOrders/labOrder.routes';
+import prescriptionRoutes from './modules/prescriptions/prescription.routes';
 
 export function createApp(): Express {
   const app = express();
@@ -26,6 +30,10 @@ export function createApp(): Express {
   app.use('/users', userRoutes);
   app.use('/patients', patientRoutes);
   app.use('/appointments', appointmentRoutes);
+  app.use('/icd-codes', icdRoutes);
+  app.use('/clinical-records', clinicalRecordRoutes);
+  app.use('/lab-orders', labOrderRoutes);
+  app.use('/prescriptions', prescriptionRoutes);
 
   return app;
 }
