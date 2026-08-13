@@ -11,11 +11,13 @@
     "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --fix",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
-    "test:unit": "jest --runInBand test/health.test.ts test/auth.service.test.ts test/authorize.middleware.test.ts test/mfa.service.test.ts",
-    "test:integration": "jest --runInBand --testTimeout=20000 test/schema.test.ts test/auth.integration.test.ts test/audit.integration.test.ts",    "migrate:down": "knex migrate:rollback --knexfile src/db/knexfile.ts",
+    "test:unit": "jest --runInBand test/health.test.ts test/auth.service.test.ts test/authorize.middleware.test.ts test/mfa.service.test.ts test/patient.service.test.ts test/emergencyMonitor.service.test.ts test/appointment.service.test.ts",
+    "test:integration": "jest --runInBand --testTimeout=40000 test/schema.test.ts test/auth.integration.test.ts test/audit.integration.test.ts test/patient.integration.test.ts test/patient.emergency.integration.test.ts test/patient.sync.integration.test.ts test/appointment.integration.test.ts",
+    "migrate:up": "knex migrate:latest --knexfile src/db/knexfile.ts",
+    "migrate:down": "knex migrate:rollback --knexfile src/db/knexfile.ts",
     "migrate:status": "knex migrate:status --knexfile src/db/knexfile.ts",
-    "prepare": "husky install",
-    "seed:demo-admin": "ts-node src/db/seedDemoAdmin.ts"
+    "seed:demo-admin": "ts-node src/db/seedDemoAdmin.ts",
+    "prepare": "husky install"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

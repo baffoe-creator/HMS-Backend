@@ -16,6 +16,8 @@ describe('Audit logging on user status change (integration, requires DB)', () =>
   let adminAccessToken: string;
 
   beforeAll(async () => {
+    await db('users').whereIn('username', ['phase1_audit_admin', 'phase1_audit_target']).del();
+
     const hash = await authService.hashPassword('AdminPass123!');
 
     const [aid] = await db('users').insert({
@@ -67,10 +69,10 @@ describe('Audit logging on user status change (integration, requires DB)', () =>
     expect(logs[0].action).toBe('UPDATE');
     expect(logs[0].user_id).toBe(adminId);
 
-    const before = JSON.parse(logs[0].before_state);
-    const after = JSON.parse(logs[0].after_state);
-    expect(before.is_active).toBe(1);
-    expect(after.is_active).toBe(0);
+    const before = logs[0].before_state;
+    const after = logs[0].after_state;
+    expect(before.is_active).toBe(true);
+    expect(after.is_active).toBe(false);
   });
 
   it('blocks a non-admin role from performing the same mutation (403)', async () => {

@@ -13,6 +13,8 @@ describe('POST /auth/login (integration, requires DB)', () => {
   let testUserId: number;
 
   beforeAll(async () => {
+    await db('users').where({ username: 'phase1_login_test' }).del();
+
     const hash = await authService.hashPassword('TestPass123!');
     const [id] = await db('users').insert({
       username: 'phase1_login_test',

@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import authRoutes from './modules/auth/auth.routes';
 import userRoutes from './modules/users/user.routes';
+import patientRoutes from './modules/patients/patient.routes';
+import appointmentRoutes from './modules/appointments/appointment.routes';
 
 export function createApp(): Express {
   const app = express();
@@ -22,6 +24,8 @@ export function createApp(): Express {
 
   app.use('/auth', authRoutes);
   app.use('/users', userRoutes);
+  app.use('/patients', patientRoutes);
+  app.use('/appointments', appointmentRoutes);
 
   return app;
 }
