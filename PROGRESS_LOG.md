@@ -45,3 +45,10 @@ still passes before moving on.
 | 3.2 | EMR (diagnosis, vitals, history) | IN PROGRESS | 2026-08-13 | Unit 2/2 PASS. Integration (`clinicalRecord.integration.test.ts`): NOT YET RUN, needs Docker DB | Write access restricted to clinician/admin at the route level; every creation writes an audit_logs row via the same `logAudit()` from Step 1.4 |
 | 3.3 | Lab order & results | IN PROGRESS | 2026-08-13 | Unit 6/6 PASS. Integration (`labOrder.integration.test.ts`): NOT YET RUN, needs Docker DB | Explicit state machine: ordered→{in_progress,cancelled}, in_progress→{completed,cancelled}, both completed/cancelled are terminal. Result required to complete |
 | 3.4 | Prescription management + interaction/allergy checks | IN PROGRESS | 2026-08-13 | Unit 5/5 PASS. Integration (`prescription.integration.test.ts`): NOT YET RUN, needs Docker DB | Allergy match = hard block (409). Drug-interaction match = warning only, prescription still created - deliberately different behaviors per the spec wording. Seed script (`npm run seed:drug-interactions`) loads a tiny starter interaction set, not a real pharmacology database |
+
+## Phase 4 — Operational Management
+
+| Step ID | Title | Status | Date | Test Gate Result | Notes |
+|---|---|---|---|---|---|
+| 4.1 | Bed/room management | IN PROGRESS | 2026-08-13 | Unit 5/5 PASS. Integration (`roomBed.integration.test.ts`): NOT YET RUN, needs Docker DB | Double-assignment prevention is enforced atomically at the DB level (UPDATE ... WHERE status='available'), not just checked in application code first - closes the race window between two concurrent admit requests |
+| 4.2 | OT scheduling | IN PROGRESS | 2026-08-13 | Unit 6/6 PASS. Integration (`otBooking.integration.test.ts`): NOT YET RUN, needs Docker DB | `rooms_beds` gained a `room_type` column (ward/ot) rather than a separate theatres table, since OT rooms share the same occupancy/identity shape. Overlap check uses standard interval-overlap logic; back-to-back bookings (one ends exactly when the next starts) are allowed, not treated as a conflict |

@@ -9,6 +9,8 @@ import icdRoutes from './modules/icd/icd.routes';
 import clinicalRecordRoutes from './modules/clinicalRecords/clinicalRecord.routes';
 import labOrderRoutes from './modules/labOrders/labOrder.routes';
 import prescriptionRoutes from './modules/prescriptions/prescription.routes';
+import roomBedRoutes from './modules/roomsBeds/roomBed.routes';
+import otBookingRoutes from './modules/otBookings/otBooking.routes';
 
 export function createApp(): Express {
   const app = express();
@@ -34,6 +36,8 @@ export function createApp(): Express {
   app.use('/clinical-records', clinicalRecordRoutes);
   app.use('/lab-orders', labOrderRoutes);
   app.use('/prescriptions', prescriptionRoutes);
+  app.use('/rooms-beds', roomBedRoutes);
+  app.use('/ot-bookings', otBookingRoutes);
 
   return app;
 }
