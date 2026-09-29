@@ -35,6 +35,17 @@ export async function create(input: {
   return created;
 }
 
+export async function findById(id: number): Promise<PrescriptionRecord | undefined> {
+  return db<PrescriptionRecord>('prescriptions').where({ id }).first();
+}
+
+export async function updateStatus(
+  id: number,
+  status: PrescriptionRecord['status'],
+): Promise<void> {
+  await db('prescriptions').where({ id }).update({ status });
+}
+
 export async function findActiveByPatient(patientId: number): Promise<PrescriptionRecord[]> {
   return db<PrescriptionRecord>('prescriptions').where({ patient_id: patientId, status: 'active' });
 }
