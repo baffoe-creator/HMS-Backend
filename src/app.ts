@@ -11,6 +11,10 @@ import labOrderRoutes from './modules/labOrders/labOrder.routes';
 import prescriptionRoutes from './modules/prescriptions/prescription.routes';
 import roomBedRoutes from './modules/roomsBeds/roomBed.routes';
 import otBookingRoutes from './modules/otBookings/otBooking.routes';
+import pharmacyInventoryRoutes from './modules/pharmacyInventory/pharmacyInventory.routes';
+import dispenseRoutes from './modules/dispenses/dispense.routes';
+import billingRoutes from './modules/billing/billing.routes';
+import nhiaRoutes from './modules/nhia/nhia.routes';
 
 export function createApp(): Express {
   const app = express();
@@ -38,6 +42,10 @@ export function createApp(): Express {
   app.use('/prescriptions', prescriptionRoutes);
   app.use('/rooms-beds', roomBedRoutes);
   app.use('/ot-bookings', otBookingRoutes);
+  app.use('/pharmacy-inventory', pharmacyInventoryRoutes);
+  app.use('/dispenses', dispenseRoutes);
+  app.use('/bills', billingRoutes);
+  app.use('/nhia', nhiaRoutes);
 
   return app;
 }
