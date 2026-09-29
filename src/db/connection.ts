@@ -11,6 +11,15 @@ function typeCast(field: { type: string; length: number; string: () => string },
   if (field.type === 'TINY' && field.length === 1) {
     return field.string() === '1';
   }
+  // mysql2 returns DECIMAL/NEWDECIMAL columns as strings (e.g. "69.00") to
+  // avoid floating-point precision loss - but every decimal field in this
+  // app (total_cost, tariff, unit_price, total_amount, etc.) is typed as
+  // `number` in code and compared as a number in tests/API responses.
+  // Casting once here avoids silent string-vs-number mismatches everywhere.
+  if (field.type === 'NEWDECIMAL' || field.type === 'DECIMAL') {
+    const value = field.string();
+    return value === null ? null : parseFloat(value);
+  }
   return next();
 }
 

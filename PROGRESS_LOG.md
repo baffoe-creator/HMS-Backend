@@ -52,3 +52,33 @@ still passes before moving on.
 |---|---|---|---|---|---|
 | 4.1 | Bed/room management | IN PROGRESS | 2026-08-13 | Unit 5/5 PASS. Integration (`roomBed.integration.test.ts`): NOT YET RUN, needs Docker DB | Double-assignment prevention is enforced atomically at the DB level (UPDATE ... WHERE status='available'), not just checked in application code first - closes the race window between two concurrent admit requests |
 | 4.2 | OT scheduling | IN PROGRESS | 2026-08-13 | Unit 6/6 PASS. Integration (`otBooking.integration.test.ts`): NOT YET RUN, needs Docker DB | `rooms_beds` gained a `room_type` column (ward/ot) rather than a separate theatres table, since OT rooms share the same occupancy/identity shape. Overlap check uses standard interval-overlap logic; back-to-back bookings (one ends exactly when the next starts) are allowed, not treated as a conflict |
+
+## Phase 5 — Pharmacy & Billing
+
+| Step ID | Title | Status | Date | Test Gate Result | Notes |
+|---|---|---|---|---|---|
+| 5.1 | Pharmacy inventory/formulary | IN PROGRESS | 2026-08-14 | Unit 4/4 PASS. Integration (`pharmacyInventory.integration.test.ts`): NOT YET RUN, needs Docker DB | Stock decrement is atomic (conditional UPDATE, same pattern as bed admission in 4.1) - two concurrent dispenses against low stock can't both succeed |
+| 5.2 | Dispensing workflow | IN PROGRESS | 2026-08-14 | Unit 4/4 PASS. Integration (`dispense.integration.test.ts`): NOT YET RUN, needs Docker DB | Dispensing checks the prescription is `active` BEFORE touching inventory at all - a missing/inactive Rx never reaches the stock-decrement step. Successful dispense marks the prescription `completed`, so it can't be dispensed twice |
+| 5.3 | Automated invoice generation | IN PROGRESS | 2026-08-14 | Unit 4/4 PASS. Integration (`billing.integration.test.ts`): NOT YET RUN, needs Docker DB | `total_amount` is always computed server-side from the line items, never trusted from request input - closes off a class of bug where client and server totals could silently drift apart |
+
+## Phase 6 — NHIA eClaims Integration (Priority Module)
+
+**Note:** Rebuilt against the real "Standardized e-claims interface for health providers' HIS,
+XML Methodology (ver. 8.6)" spec document (previously only had a text description of it).
+Field names, structure, and error codes below are now traceable to the actual spec, not a
+reconstruction.
+
+| Step ID | Title | Status | Date | Test Gate Result | Notes |
+|---|---|---|---|---|---|
+| 6.1 | Data dictionary & field mapping | IN PROGRESS | 2026-08-14 | Unit 4/4 PASS (`nhia.mapping.test.ts`) | `REQUIRED_FIELDS` list + `FIELD_MAP` registry; completeness test fails if any required field lacks a mapping |
+| 6.2 | Async Claim XML generation | IN PROGRESS | 2026-08-14 | Unit 9/9 PASS (`nhia.xmlGenerator.test.ts`). Integration confirms real end-to-end generation | **Scope note**: generation is synchronous, not on a BullMQ/Redis worker queue - Redis has sat unused in docker-compose since Phase 0 with no queue infra ever wired up. Flagging honestly rather than pretending async infra exists. The generation *logic* itself is correct and tested; only the "runs on a background worker" part is deferred |
+| 6.3 | Pre-submission validation rules | IN PROGRESS | 2026-08-14 | Unit 13/13 PASS (`nhia.validation.test.ts`) | Implements ~24 of the ~100 documented 2nd-verification-level error codes (203, 205, 207, 210, 212, 214, 218, 221, 230, 238, 240, 241, 244-247, 267-269, 292-293) — the ones our schema can verify without external master-table data (ICD-10/G-DRG/medicine formulary lookups are out of scope until those reference lists are integrated). Uses the REAL documented codes, not invented ones |
+| 6.4 | Feedback XML ingestion & reconciliation | IN PROGRESS | 2026-08-14 | Unit 4/4 PASS (`nhia.feedback.test.ts`). Integration confirms real reconciliation end-to-end | Matches by ClaimIdentificationNumber; handles both 2nd-level (ErrorCode) and 3rd-level (ClaimRejectionReason + AdjustmentValue) feedback per the real spec's two Feedback XML shapes |
+| 6.5 | NHIA sandbox certification | NOT STARTED | | N/A - no real NHIA sandbox access | Cannot be completed without actual NHIA credentials/environment. This is a genuine, permanent blocker until the hospital has real NHIA onboarding - not something I can simulate meaningfully |
+
+### Real bug caught by writing the tests
+`fast-xml-parser`'s default numeric coercion silently stripped leading zeros from
+identifiers (e.g. reason code `"023"` → `23`). Fixed by setting `parseTagValue: false`
+on the Feedback XML parser - every genuinely-numeric field (`AdjustmentValue`) is already
+explicitly `Number()`-converted downstream, so this cost nothing and prevents real data
+corruption on ingestion.
