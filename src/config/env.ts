@@ -28,4 +28,13 @@ export const env = {
     expiresIn: process.env.JWT_EXPIRES_IN ?? '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
   },
+  encryption: {
+    // Phase 7.1: PII/PHI encryption keys (Act 843 compliance).
+    // No fallback defaults — app fails to boot if these are not set,
+    // which is intentional. A silently-encrypted database with a hardcoded
+    // key is worse than a loudly-refusing app.
+    // See PHASE_7_1_ENCRYPTION_IMPLEMENTATION_SPEC.md for key generation.
+    fieldKey: required('HMS_FIELD_ENCRYPTION_KEY'),
+    blindIndexKey: required('HMS_BLIND_INDEX_KEY'),
+  },
 };
