@@ -40,13 +40,13 @@ function toRow(input: CreatePatientInput) {
     other_name: input.otherName,
     dob: input.dob ?? null,
     gender: input.gender,
-    member_number_new: encryptField(input.memberNumber ?? null),
+    member_number: encryptField(input.memberNumber ?? null),
     member_number_bidx: blindIndex(input.memberNumber ?? null),
-    temp_card_number_new: encryptField(input.tempCardNumber ?? null),
+    temp_card_number: encryptField(input.tempCardNumber ?? null),
     temp_card_number_bidx: blindIndex(input.tempCardNumber ?? null),
-    card_serial_new: encryptField(input.cardSerial ?? null),
+    card_serial: encryptField(input.cardSerial ?? null),
     card_serial_bidx: blindIndex(input.cardSerial ?? null),
-    hospital_record_number_new: encryptField(input.hospitalRecordNumber ?? null),
+    hospital_record_number: encryptField(input.hospitalRecordNumber ?? null),
     hospital_record_number_bidx: blindIndex(input.hospitalRecordNumber ?? null),
     is_infant: input.isInfant ?? false,
     is_emergency: input.isEmergency ?? false,
@@ -67,10 +67,10 @@ function fromRow(row: Record<string, unknown>): PatientRecord {
     other_name: row.other_name as string,
     dob: row.dob as string | null,
     gender: row.gender as string,
-    member_number: decryptField(row.member_number_new as string | null),
-    temp_card_number: decryptField(row.temp_card_number_new as string | null),
-    card_serial: decryptField(row.card_serial_new as string | null),
-    hospital_record_number: decryptField(row.hospital_record_number_new as string | null),
+    member_number: decryptField(row.member_number as string | null),
+    temp_card_number: decryptField(row.temp_card_number as string | null),
+    card_serial: decryptField(row.card_serial as string | null),
+    hospital_record_number: decryptField(row.hospital_record_number as string | null),
     is_infant: row.is_infant as boolean,
     is_emergency: row.is_emergency as boolean,
     emergency_completed_at: row.emergency_completed_at as string | null,
@@ -142,19 +142,19 @@ export async function update(
   if (fields.dob !== undefined) row.dob = fields.dob;
   if (fields.gender !== undefined) row.gender = fields.gender;
   if (fields.memberNumber !== undefined) {
-    row.member_number_new = encryptField(fields.memberNumber);
+    row.member_number = encryptField(fields.memberNumber);
     row.member_number_bidx = blindIndex(fields.memberNumber);
   }
   if (fields.tempCardNumber !== undefined) {
-    row.temp_card_number_new = encryptField(fields.tempCardNumber);
+    row.temp_card_number = encryptField(fields.tempCardNumber);
     row.temp_card_number_bidx = blindIndex(fields.tempCardNumber);
   }
   if (fields.cardSerial !== undefined) {
-    row.card_serial_new = encryptField(fields.cardSerial);
+    row.card_serial = encryptField(fields.cardSerial);
     row.card_serial_bidx = blindIndex(fields.cardSerial);
   }
   if (fields.hospitalRecordNumber !== undefined) {
-    row.hospital_record_number_new = encryptField(fields.hospitalRecordNumber);
+    row.hospital_record_number = encryptField(fields.hospitalRecordNumber);
     row.hospital_record_number_bidx = blindIndex(fields.hospitalRecordNumber);
   }
   if (fields.isInfant !== undefined) row.is_infant = fields.isInfant;
