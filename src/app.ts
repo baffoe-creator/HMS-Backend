@@ -15,15 +15,25 @@ import pharmacyInventoryRoutes from './modules/pharmacyInventory/pharmacyInvento
 import dispenseRoutes from './modules/dispenses/dispense.routes';
 import billingRoutes from './modules/billing/billing.routes';
 import nhiaRoutes from './modules/nhia/nhia.routes';
+import {
+  globalLimiter,
+  authLimiter,
+  sensitiveOperationLimiter,
+  requestValidationMiddleware,
+} from './middleware/rateLimiter';
+import { env } from './config/env';
 
 export function createApp(): Express {
   const app = express();
 
+  app.set('trust proxy', env.trustProxyHops);
+
   app.use(helmet());
   app.use(cors());
-  app.use(express.json());
+  app.use(globalLimiter);
+  app.use(requestValidationMiddleware);
+  app.use(express.json({ limit: '2mb' }));
 
-  // Health check - used by Docker, CI, and staging deploy verification
   app.get('/health', (_req: Request, res: Response) => {
     res.status(200).json({
       status: 'ok',
@@ -32,9 +42,9 @@ export function createApp(): Express {
     });
   });
 
-  app.use('/auth', authRoutes);
+  app.use('/auth', authLimiter, authRoutes);
   app.use('/users', userRoutes);
-  app.use('/patients', patientRoutes);
+  app.use('/patients', sensitiveOperationLimiter, patientRoutes);
   app.use('/appointments', appointmentRoutes);
   app.use('/icd-codes', icdRoutes);
   app.use('/clinical-records', clinicalRecordRoutes);
@@ -44,8 +54,8 @@ export function createApp(): Express {
   app.use('/ot-bookings', otBookingRoutes);
   app.use('/pharmacy-inventory', pharmacyInventoryRoutes);
   app.use('/dispenses', dispenseRoutes);
-  app.use('/bills', billingRoutes);
-  app.use('/nhia', nhiaRoutes);
+  app.use('/bills', sensitiveOperationLimiter, billingRoutes);
+  app.use('/nhia', sensitiveOperationLimiter, nhiaRoutes);
 
   return app;
 }

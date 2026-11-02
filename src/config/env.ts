@@ -14,6 +14,7 @@ function required(name: string, fallback?: string): string {
 
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
+  trustProxyHops: parseInt(process.env.TRUST_PROXY_HOPS ?? '1', 10),
   port: parseInt(process.env.PORT ?? '4000', 10),
   db: {
     host: required('DB_HOST', '127.0.0.1'),

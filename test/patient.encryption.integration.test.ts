@@ -20,8 +20,8 @@ describe('Patient PII encryption at rest (integration, requires DB) - Step 7.1 g
     createdIds.push(patient.id);
 
     const raw = await db('patients').where({ id: patient.id }).first();
-    expect(raw.member_number_new).not.toContain('GH-99999999');
-    expect(raw.hospital_record_number_new).not.toContain('HRN-0001');
+    expect(raw.member_number).not.toContain('GH-99999999');
+    expect(raw.hospital_record_number).not.toContain('HRN-0001');
     expect(raw.member_number_bidx).toMatch(/^[a-f0-9]{64}$/);
   });
 
