@@ -1,22 +1,34 @@
 import Redis from 'ioredis';
 import { env } from '../config/env';
 
-export const redisClient = new Redis(env.redisUrl ?? 'redis://127.0.0.1:6379', {
+/**
+ * Shared Redis connection for rate-limit counters.
+ *
+ * Do not set ioredis `commandTimeout`: it also affects handshake commands.
+ * The limiter applies its own timeout around rate-limit operations.
+ */
+export const redisClient = new Redis(env.redisUrl, {
   lazyConnect: true,
-  enableReadyCheck: true,
-  maxRetriesPerRequest: 3,
-  retryStrategy: (times) => {
-    if (times > 3) return null;
-    return 200;
-  },
+  maxRetriesPerRequest: 1,
+  connectTimeout: 5000,
 });
 
 redisClient.on('error', (err) => {
-  console.warn('Redis warning:', (err as Error).message);
+  console.error('Redis client error (rate limiting will fail open):', err.message);
 });
 
 export async function closeRedisClient(): Promise<void> {
-  if (process.env.NODE_ENV === 'test') return;
-  if (redisClient.status === 'wait' || redisClient.status === 'end') return;
-  await redisClient.quit();
+  const status = redisClient.status;
+
+  if (status === 'wait' || status === 'end') {
+    return;
+  }
+
+  if (status === 'ready') {
+    await redisClient.quit();
+    return;
+  }
+
+  // Avoid waiting for quit() while the client is still connecting/reconnecting.
+  redisClient.disconnect();
 }

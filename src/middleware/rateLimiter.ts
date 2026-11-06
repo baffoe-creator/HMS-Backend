@@ -1,45 +1,94 @@
-import { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { redisClient } from '../utils/redisClient';
 
-type Bucket = {
-  count: number;
-  resetAt: number;
-};
+const REDIS_TIMEOUT_MS = Number(
+  process.env.RATE_LIMIT_REDIS_TIMEOUT_MS ?? 3000,
+);
 
-const localStore: Record<string, Bucket> = {};
+const INCR_WITH_EXPIRE_LUA = `
+local current = redis.call("INCR", KEYS[1])
+if tonumber(current) == 1 then
+  redis.call("PEXPIRE", KEYS[1], ARGV[1])
+end
+return current
+`;
 
-function inMemoryLimiter(
-  windowMs: number,
-  maxRequests: number,
-  keyGenerator: (req: Request) => string,
-  message: string
-) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const key = keyGenerator(req);
-    const now = Date.now();
+interface RateLimitOptions {
+  windowMs: number;
+  maxRequests: number;
+  keyPrefix: string;
+  keyGenerator?: (req: Request) => string;
+  message?: string;
+}
 
-    if (!localStore[key]) {
-      localStore[key] = { count: 0, resetAt: now + windowMs };
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Redis command exceeded ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+export function createRateLimiter(options: RateLimitOptions) {
+  const {
+    windowMs,
+    maxRequests,
+    keyPrefix,
+    keyGenerator = (req) => req.ip || 'unknown',
+    message = 'Too many requests, please try again later',
+  } = options;
+
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    const redisKey = `ratelimit:${keyPrefix}:${keyGenerator(req)}`;
+
+    let count: number;
+
+    try {
+      const result = await withTimeout(
+        redisClient.eval(
+          INCR_WITH_EXPIRE_LUA,
+          1,
+          redisKey,
+          String(windowMs),
+        ),
+        REDIS_TIMEOUT_MS,
+      );
+
+      count = Number(result);
+    } catch (error) {
+      console.error(
+        `Rate limiter Redis error on "${redisKey}", failing open:`,
+        error instanceof Error ? error.message : String(error),
+      );
+      next();
+      return;
     }
-
-    const bucket = localStore[key];
-    if (bucket.resetAt <= now) {
-      bucket.count = 0;
-      bucket.resetAt = now + windowMs;
-    }
-
-    bucket.count++;
 
     res.set('RateLimit-Limit', String(maxRequests));
-    res.set('RateLimit-Remaining', String(Math.max(0, maxRequests - bucket.count)));
-    res.set('RateLimit-Reset', String(Math.ceil(bucket.resetAt / 1000)));
+    res.set('RateLimit-Remaining', String(Math.max(0, maxRequests - count)));
+    res.set(
+      'RateLimit-Reset',
+      String(Math.ceil((Date.now() + windowMs) / 1000)),
+    );
 
-    if (bucket.count > maxRequests) {
-      res.status(429).json({
-        status: 'error',
-        message,
-        retryAfter: Math.ceil((bucket.resetAt - now) / 1000),
-      });
+    if (count > maxRequests) {
+      res.set('Retry-After', String(Math.ceil(windowMs / 1000)));
+      res.status(429).json({ error: message });
       return;
     }
 
@@ -47,78 +96,29 @@ function inMemoryLimiter(
   };
 }
 
-export function createRateLimiter(options: {
-  windowMs: number;
-  maxRequests: number;
-  keyGenerator: (req: Request) => string;
-  message: string;
-}) {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    const key = options.keyGenerator(req);
-
-    try {
-      if (!redisClient || redisClient.status !== 'ready') {
-        return inMemoryLimiter(
-          options.windowMs,
-          options.maxRequests,
-          options.keyGenerator,
-          options.message
-        )(req, res, next);
-      }
-
-      const redisKey = `ratelimit:${key}`;
-      const count = await redisClient.incr(redisKey);
-      if (count === 1) {
-        await redisClient.pexpire(redisKey, options.windowMs);
-      }
-
-      const remaining = Math.max(0, options.maxRequests - count);
-      res.set('RateLimit-Limit', String(options.maxRequests));
-      res.set('RateLimit-Remaining', String(remaining));
-      res.set('RateLimit-Reset', String(Math.ceil((Date.now() + options.windowMs) / 1000)));
-
-      if (count > options.maxRequests) {
-        res.status(429).json({
-          status: 'error',
-          message: options.message,
-          retryAfter: Math.ceil(options.windowMs / 1000),
-        });
-        return;
-      }
-
-      next();
-    } catch (err) {
-      return inMemoryLimiter(
-        options.windowMs,
-        options.maxRequests,
-        options.keyGenerator,
-        options.message
-      )(req, res, next);
-    }
-  };
-}
-
 export const globalLimiter = createRateLimiter({
   windowMs: 60_000,
   maxRequests: 1000,
-  keyGenerator: (req) => req.ip || 'unknown',
-  message: 'Too many requests from this IP address',
+  keyPrefix: 'global',
 });
 
 export const authLimiter = createRateLimiter({
   windowMs: 60_000,
   maxRequests: 10,
-  keyGenerator: (req) => req.ip || 'unknown',
+  keyPrefix: 'auth',
   message: 'Too many login attempts, please try again later',
 });
 
 export const sensitiveOperationLimiter = createRateLimiter({
   windowMs: 60_000,
   maxRequests: 100,
+  keyPrefix: 'sensitive',
   keyGenerator: (req) => {
-    type AuthRequest = Request & { user?: { id?: string | number } };
-    const userId = (req as AuthRequest).user?.id;
-    return userId ? `user:${userId}` : `ip:${req.ip || 'unknown'}`;
+    const userId = req.user?.id;
+
+    return userId
+      ? `user:${userId}`
+      : `ip:${req.ip || 'unknown'}`;
   },
   message: 'Too many requests, please slow down',
 });
@@ -126,21 +126,22 @@ export const sensitiveOperationLimiter = createRateLimiter({
 export function requestValidationMiddleware(
   req: Request,
   res: Response,
-  next: NextFunction
-) {
+  next: NextFunction,
+): void {
   if (!req.get('Host')) {
-    res.status(400).json({ status: 'error', message: 'Invalid request: missing Host header' });
+    res.status(400).json({ error: 'Invalid request: missing Host header' });
     return;
   }
 
-  const contentLength = Number(req.get('Content-Length') || 0);
+  const contentLength = Number(req.get('Content-Length') ?? 0);
+
   if (contentLength > 10 * 1024 * 1024) {
-    res.status(413).json({ status: 'error', message: 'Payload too large' });
+    res.status(413).json({ error: 'Payload too large' });
     return;
   }
 
   if (req.url.length > 4096) {
-    res.status(414).json({ status: 'error', message: 'URI too long' });
+    res.status(414).json({ error: 'URI too long' });
     return;
   }
 

@@ -18,7 +18,6 @@ import nhiaRoutes from './modules/nhia/nhia.routes';
 import {
   globalLimiter,
   authLimiter,
-  sensitiveOperationLimiter,
   requestValidationMiddleware,
 } from './middleware/rateLimiter';
 import { env } from './config/env';
@@ -44,7 +43,7 @@ export function createApp(): Express {
 
   app.use('/auth', authLimiter, authRoutes);
   app.use('/users', userRoutes);
-  app.use('/patients', sensitiveOperationLimiter, patientRoutes);
+  app.use('/patients', patientRoutes);
   app.use('/appointments', appointmentRoutes);
   app.use('/icd-codes', icdRoutes);
   app.use('/clinical-records', clinicalRecordRoutes);
@@ -54,8 +53,8 @@ export function createApp(): Express {
   app.use('/ot-bookings', otBookingRoutes);
   app.use('/pharmacy-inventory', pharmacyInventoryRoutes);
   app.use('/dispenses', dispenseRoutes);
-  app.use('/bills', sensitiveOperationLimiter, billingRoutes);
-  app.use('/nhia', sensitiveOperationLimiter, nhiaRoutes);
+  app.use('/bills', billingRoutes);
+  app.use('/nhia', nhiaRoutes);
 
   return app;
 }
