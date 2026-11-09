@@ -5,16 +5,29 @@ import * as authService from '../src/modules/auth/auth.service';
 
 const app = createApp();
 
+/**
+ * Removes this suite's fixtures in FK-safe order (bookings first, because
+ * ot_bookings references users/rooms/patients with RESTRICT). Runs before AND
+ * after, so an interrupted earlier run can never block the next one.
+ */
+async function purgeFixtures(): Promise<void> {
+  const staleUsers = db('users').select('id').where({ username: 'phase4_ot_clinician' });
+  const staleRooms = db('rooms_beds').select('id').whereIn('room_number', ['OT-P4', 'W-P4']);
+  await db('ot_bookings').whereIn('surgeon_id', staleUsers).orWhereIn('room_id', staleRooms).del();
+  await db('rooms_beds').whereIn('room_number', ['OT-P4', 'W-P4']).del();
+  await db('patients').where({ surname: 'OT', other_name: 'Case' }).del();
+  await db('users').where({ username: 'phase4_ot_clinician' }).del();
+}
+
 describe('OT booking (integration, requires DB) - Step 4.2 gate', () => {
   let clinicianToken: string;
   let surgeonId: number;
   let patientId: number;
   let otRoomId: number;
   let wardRoomId: number;
-  const bookingIds: number[] = [];
 
   beforeAll(async () => {
-    await db('users').where({ username: 'phase4_ot_clinician' }).del();
+    await purgeFixtures();
 
     const hash = await authService.hashPassword('Pass123!');
     const [cid] = await db('users').insert({
@@ -51,10 +64,7 @@ describe('OT booking (integration, requires DB) - Step 4.2 gate', () => {
   });
 
   afterAll(async () => {
-    if (bookingIds.length > 0) await db('ot_bookings').whereIn('id', bookingIds).del();
-    await db('rooms_beds').whereIn('id', [otRoomId, wardRoomId]).del();
-    await db('patients').where({ id: patientId }).del();
-    await db('users').where({ username: 'phase4_ot_clinician' }).del();
+    await purgeFixtures();
     await db.destroy();
   });
 
@@ -70,7 +80,6 @@ describe('OT booking (integration, requires DB) - Step 4.2 gate', () => {
         scheduledEnd: '2026-09-05T11:00:00.000Z',
       });
     expect(res.status).toBe(201);
-    bookingIds.push(res.body.id);
   });
 
   it('rejects an overlapping booking in the same theatre (409)', async () => {
@@ -99,7 +108,6 @@ describe('OT booking (integration, requires DB) - Step 4.2 gate', () => {
         scheduledEnd: '2026-09-05T13:00:00.000Z',
       });
     expect(res.status).toBe(201);
-    bookingIds.push(res.body.id);
   });
 
   it('rejects booking a non-OT room', async () => {

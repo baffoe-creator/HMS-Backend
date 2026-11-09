@@ -1,3 +1,4 @@
+import 'express-async-errors';
 import express, { type Express, type Request, type Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -20,6 +21,8 @@ import {
   authLimiter,
   requestValidationMiddleware,
 } from './middleware/rateLimiter';
+import { errorHandler } from './middleware/errorHandler';
+import { db } from './db/connection';
 import { env } from './config/env';
 
 export function createApp(): Express {
@@ -28,7 +31,7 @@ export function createApp(): Express {
   app.set('trust proxy', env.trustProxyHops);
 
   app.use(helmet());
-  app.use(cors());
+  app.use(cors({ origin: env.corsOrigins }));
   app.use(globalLimiter);
   app.use(requestValidationMiddleware);
   app.use(express.json({ limit: '2mb' }));
@@ -39,6 +42,15 @@ export function createApp(): Express {
       service: 'hms-backend',
       timestamp: new Date().toISOString(),
     });
+  });
+
+  app.get('/health/ready', async (_req: Request, res: Response) => {
+    try {
+      await db.raw('select 1');
+      res.status(200).json({ status: 'ready' });
+    } catch {
+      res.status(503).json({ status: 'unavailable' });
+    }
   });
 
   app.use('/auth', authLimiter, authRoutes);
@@ -55,6 +67,8 @@ export function createApp(): Express {
   app.use('/dispenses', dispenseRoutes);
   app.use('/bills', billingRoutes);
   app.use('/nhia', nhiaRoutes);
+
+  app.use(errorHandler);
 
   return app;
 }

@@ -57,11 +57,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate ephemeral encryption keys for this run
+        run: |
+          echo "HMS_FIELD_ENCRYPTION_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "HMS_BLIND_INDEX_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Lint
         run: npm run lint
 
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Write .env.development for CI
         run: |
@@ -75,6 +83,8 @@ jobs:
           DB_NAME=hms_dev
           REDIS_URL=redis://127.0.0.1:6379
           JWT_SECRET=ci_test_secret
+          HMS_FIELD_ENCRYPTION_KEY=${HMS_FIELD_ENCRYPTION_KEY}
+          HMS_BLIND_INDEX_KEY=${HMS_BLIND_INDEX_KEY}
           EOF
 
       - name: Wait for MySQL
