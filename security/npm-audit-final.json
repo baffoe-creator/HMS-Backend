@@ -1,4 +1,4 @@
-﻿{
+{
   "auditReportVersion": 2,
   "vulnerabilities": {
     "@jest/core": {
@@ -37,7 +37,7 @@
       ],
       "fixAvailable": {
         "name": "@typescript-eslint/eslint-plugin",
-        "version": "6.15.0",
+        "version": "7.0.0",
         "isSemVerMajor": true
       }
     },
@@ -114,7 +114,7 @@
       ],
       "fixAvailable": {
         "name": "@typescript-eslint/eslint-plugin",
-        "version": "6.15.0",
+        "version": "7.0.0",
         "isSemVerMajor": true
       }
     },
@@ -292,12 +292,12 @@
       "total": 13
     },
     "dependencies": {
-      "prod": 162,
+      "prod": 163,
       "dev": 428,
       "optional": 2,
       "peer": 0,
       "peerOptional": 0,
-      "total": 589
+      "total": 590
     }
   }
 }

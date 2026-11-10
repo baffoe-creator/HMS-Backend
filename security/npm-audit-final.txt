@@ -1,4 +1,4 @@
-﻿# npm audit report
+# npm audit report
 
 deepmerge  >=4.2.0
 deepmerge mergeObject() allows prototype poisoning of returned objects - https://github.com/advisories/GHSA-gcqx-w48m-w2h4
@@ -11,13 +11,6 @@ node_modules/deepmerge
     @jest/core  >=25.2.0-alpha.86
     Depends on vulnerable versions of jest-config
     node_modules/@jest/core
-      jest  >=25.2.0-alpha.86
-      Depends on vulnerable versions of @jest/core
-      Depends on vulnerable versions of jest-cli
-      node_modules/jest
-        ts-jest  >=25.10.0-alpha.1
-        Depends on vulnerable versions of jest
-        node_modules/ts-jest
     create-jest  >=29.7.0
     Depends on vulnerable versions of jest-config
     node_modules/create-jest
@@ -26,6 +19,13 @@ node_modules/deepmerge
       Depends on vulnerable versions of create-jest
       Depends on vulnerable versions of jest-config
       node_modules/jest-cli
+        jest  >=25.2.0-alpha.86
+        Depends on vulnerable versions of @jest/core
+        Depends on vulnerable versions of jest-cli
+        node_modules/jest
+          ts-jest  >=25.10.0-alpha.1
+          Depends on vulnerable versions of jest
+          node_modules/ts-jest
 
 minimatch  7.0.0 - 11.0.0
 Severity: moderate
