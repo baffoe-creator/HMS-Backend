@@ -1,0 +1,135 @@
+name: ZAP Baseline
+
+# Phase 7.4 internal assessment: passive OWASP ZAP baseline scan against the
+# API running inside a GitHub runner. Runners can reach ghcr.io reliably, so
+# the large ZAP image never has to be pulled over the developer's connection.
+#
+# Triggers:
+#  - push that changes THIS file (runs once from whatever branch you push)
+#  - manual "Run workflow" button (only appears once this file is on main)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/zap-baseline.yml"
+
+jobs:
+  zap-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root_password
+          MYSQL_DATABASE: hms_dev
+          MYSQL_USER: hms_user
+          MYSQL_PASSWORD: hms_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -proot_password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      NODE_ENV: development
+      PORT: 4000
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: hms_user
+      DB_PASSWORD: hms_password
+      DB_NAME: hms_dev
+      REDIS_URL: redis://127.0.0.1:6379
+      JWT_SECRET: zap_scan_throwaway_secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The app refuses to boot without these (Phase 7.1). Throwaway values,
+      # generated per run: no repository secrets are needed for this workflow.
+      - name: Generate ephemeral encryption keys
+        run: |
+          echo "HMS_FIELD_ENCRYPTION_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "HMS_BLIND_INDEX_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      # MySQL's health check can pass while its init server is still
+      # restarting, so retry the migration instead of assuming it is ready.
+      - name: Run migrations
+        run: |
+          for i in $(seq 1 30); do
+            if npm run migrate:up; then
+              exit 0
+            fi
+            echo "Migration attempt $i failed, retrying in 3s..."
+            sleep 3
+          done
+          exit 1
+
+      - name: Start API
+        run: |
+          nohup npx ts-node --transpile-only src/index.ts > api.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4000/health > /dev/null; then
+              echo "API is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API did not become healthy. Log follows:"
+          cat api.log
+          exit 1
+
+      # The API has no HTML pages for ZAP's spider to follow, so scan a few
+      # representative URLs: a public route, an authenticated route (401
+      # response) and a nonexistent route (404 page). Each gets its own report.
+      - name: Run ZAP baseline scans
+        run: |
+          mkdir -p zap-out
+          chmod 777 zap-out
+          status=0
+          for path in health patients/1 does-not-exist; do
+            name=$(echo "$path" | tr '/' '-')
+            rc=0
+            docker run --rm --network host \
+              -v "$(pwd)/zap-out:/zap/wrk:rw" \
+              ghcr.io/zaproxy/zaproxy:stable \
+              zap-baseline.py -t "http://localhost:4000/$path" -m 1 -I \
+              -r "zap-$name.html" -J "zap-$name.json" || rc=$?
+            echo "ZAP exit code for /$path: $rc"
+            if [ "$rc" -ne 0 ]; then
+              status=1
+            fi
+          done
+          exit $status
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-baseline-report
+          path: |
+            zap-out/
+            api.log
+          retention-days: 30
